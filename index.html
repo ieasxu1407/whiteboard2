@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>화이트보드 안정버전 FINAL</title>
+<title>화이트보드 안정버전</title>
 
 <style>
 html, body {
@@ -13,7 +13,7 @@ html, body {
   background:#0b1d0b;
 }
 
-/* 캔버스 */
+/* 그림용 캔버스 */
 #canvas {
   position:fixed;
   top:0; left:0;
@@ -21,8 +21,8 @@ html, body {
   z-index:0;
 }
 
-/* 이벤트용 레이어 */
-#drawLayer {
+/* 🔥 이벤트 전용 영역 */
+#drawArea {
   position:fixed;
   top:0; left:0;
   width:100%; height:100%;
@@ -49,6 +49,7 @@ button {
   border:none;
   padding:10px;
   border-radius:10px;
+  font-size:14px;
 }
 </style>
 </head>
@@ -56,7 +57,7 @@ button {
 <body>
 
 <canvas id="canvas"></canvas>
-<div id="drawLayer"></div>
+<div id="drawArea"></div>
 
 <div class="toolbar">
   <button onclick="setMode('pen')">펜</button>
@@ -70,19 +71,19 @@ button {
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const layer = document.getElementById('drawLayer');
+const area = document.getElementById('drawArea');
 
 function resize(){
   canvas.width = innerWidth;
   canvas.height = innerHeight;
   draw();
 }
+window.addEventListener('resize', resize);
 resize();
-addEventListener('resize', resize);
 
 let mode='pen';
 let drawing=false;
-let startX=0, startY=0;
+let startX=0,startY=0;
 let data=[];
 let history=[];
 let selected=null;
@@ -106,34 +107,34 @@ function clearBoard(){
   draw();
 }
 
-function getPos(e){
+function pos(e){
   if(e.touches) return {
     x:e.touches[0].clientX,
     y:e.touches[0].clientY
   };
-  return {x:e.clientX, y:e.clientY};
+  return {x:e.clientX,y:e.clientY};
 }
 
-/* 🔥 drawLayer만 이벤트 받음 */
-layer.addEventListener('mousedown', start);
-layer.addEventListener('mousemove', move);
-layer.addEventListener('mouseup', end);
+/* 🔥 drawArea만 이벤트 받음 */
+area.addEventListener('mousedown',start);
+area.addEventListener('mousemove',move);
+area.addEventListener('mouseup',end);
 
-layer.addEventListener('touchstart', start, {passive:false});
-layer.addEventListener('touchmove', move, {passive:false});
-layer.addEventListener('touchend', end, {passive:false});
+area.addEventListener('touchstart',start,{passive:false});
+area.addEventListener('touchmove',move,{passive:false});
+area.addEventListener('touchend',end,{passive:false});
 
 function start(e){
   e.preventDefault();
   drawing=true;
 
-  const p=getPos(e);
+  const p=pos(e);
   startX=p.x;
   startY=p.y;
 
   if(mode==='pen'){
     save();
-    data.push({type:'pen', pts:[p]});
+    data.push({t:'pen',pts:[p]});
   }
 
   if(mode==='select'){
@@ -148,7 +149,7 @@ function move(e){
   if(!drawing) return;
   e.preventDefault();
 
-  const p=getPos(e);
+  const p=pos(e);
 
   if(mode==='pen'){
     data[data.length-1].pts.push(p);
@@ -166,16 +167,16 @@ function move(e){
 
 function end(e){
   drawing=false;
-  const p=getPos(e);
+  const p=pos(e);
 
   if(mode==='rect'){
     save();
-    data.push({type:'rect',x:startX,y:startY,w:p.x-startX,h:p.y-startY});
+    data.push({t:'rect',x:startX,y:startY,w:p.x-startX,h:p.y-startY});
   }
 
   if(mode==='circle'){
     save();
-    data.push({type:'circle',x:startX,y:startY,r:Math.hypot(p.x-startX,p.y-startY)});
+    data.push({t:'circle',x:startX,y:startY,r:Math.hypot(p.x-startX,p.y-startY)});
   }
 
   selected=null;
@@ -185,6 +186,7 @@ function end(e){
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
+  /* 칠판 배경 */
   ctx.fillStyle='#0b1d0b';
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
@@ -200,7 +202,7 @@ function draw(){
     ctx.strokeStyle='#fff';
     ctx.lineWidth=2;
 
-    if(d.type==='pen'){
+    if(d.t==='pen'){
       ctx.beginPath();
       d.pts.forEach((p,i)=>{
         if(i===0) ctx.moveTo(p.x,p.y);
@@ -209,11 +211,11 @@ function draw(){
       ctx.stroke();
     }
 
-    if(d.type==='rect'){
+    if(d.t==='rect'){
       ctx.strokeRect(d.x,d.y,d.w,d.h);
     }
 
-    if(d.type==='circle'){
+    if(d.t==='circle'){
       ctx.beginPath();
       ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
       ctx.stroke();
