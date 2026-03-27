@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>화이트보드 안정버전</title>
+<title>화이트보드 안정버전 FINAL</title>
 
 <style>
 html, body {
@@ -14,17 +14,25 @@ html, body {
 }
 
 /* 캔버스 */
-canvas {
+#canvas {
   position:fixed;
   top:0; left:0;
   width:100%; height:100%;
   z-index:0;
 }
 
+/* 이벤트용 레이어 */
+#drawLayer {
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  z-index:1;
+}
+
 /* 버튼 */
 .toolbar {
   position:fixed;
-  bottom:15px;
+  bottom:20px;
   left:50%;
   transform:translateX(-50%);
   background:#1a2e1a;
@@ -41,42 +49,45 @@ button {
   border:none;
   padding:10px;
   border-radius:10px;
-  font-size:14px;
 }
 </style>
 </head>
 
 <body>
 
-<canvas id="c"></canvas>
+<canvas id="canvas"></canvas>
+<div id="drawLayer"></div>
 
 <div class="toolbar">
-  <button onclick="mode='pen'">펜</button>
-  <button onclick="mode='rect'">사각형</button>
-  <button onclick="mode='circle'">원</button>
-  <button onclick="mode='select'">선택</button>
+  <button onclick="setMode('pen')">펜</button>
+  <button onclick="setMode('rect')">사각형</button>
+  <button onclick="setMode('circle')">원</button>
+  <button onclick="setMode('select')">선택</button>
   <button onclick="undo()">실행취소</button>
   <button onclick="clearBoard()">전체삭제</button>
 </div>
 
 <script>
-const canvas = document.getElementById('c');
+const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const layer = document.getElementById('drawLayer');
 
 function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
   draw();
 }
-window.addEventListener('resize', resize);
 resize();
+addEventListener('resize', resize);
 
-let mode = 'pen';
-let drawing = false;
-let startX = 0, startY = 0;
-let data = [];
-let history = [];
-let selected = null;
+let mode='pen';
+let drawing=false;
+let startX=0, startY=0;
+let data=[];
+let history=[];
+let selected=null;
+
+function setMode(m){ mode=m; }
 
 function save(){
   history.push(JSON.stringify(data));
@@ -91,7 +102,7 @@ function undo(){
 
 function clearBoard(){
   save();
-  data = [];
+  data=[];
   draw();
 }
 
@@ -100,108 +111,81 @@ function getPos(e){
     x:e.touches[0].clientX,
     y:e.touches[0].clientY
   };
-  return {
-    x:e.clientX,
-    y:e.clientY
-  };
+  return {x:e.clientX, y:e.clientY};
 }
 
-/* 🔥 핵심: 버튼 영역 클릭은 무시 */
-function isUI(e){
-  return e.target.closest('.toolbar');
-}
+/* 🔥 drawLayer만 이벤트 받음 */
+layer.addEventListener('mousedown', start);
+layer.addEventListener('mousemove', move);
+layer.addEventListener('mouseup', end);
 
-/* 이벤트 */
-document.addEventListener('mousedown', start);
-document.addEventListener('mousemove', move);
-document.addEventListener('mouseup', end);
-
-document.addEventListener('touchstart', start, {passive:false});
-document.addEventListener('touchmove', move, {passive:false});
-document.addEventListener('touchend', end, {passive:false});
+layer.addEventListener('touchstart', start, {passive:false});
+layer.addEventListener('touchmove', move, {passive:false});
+layer.addEventListener('touchend', end, {passive:false});
 
 function start(e){
-  if(isUI(e)) return;
-
   e.preventDefault();
-  drawing = true;
+  drawing=true;
 
-  const p = getPos(e);
-  startX = p.x;
-  startY = p.y;
+  const p=getPos(e);
+  startX=p.x;
+  startY=p.y;
 
-  if(mode === 'pen'){
+  if(mode==='pen'){
     save();
-    data.push({type:'pen', points:[p]});
+    data.push({type:'pen', pts:[p]});
   }
 
-  if(mode === 'select'){
-    selected = data.find(d =>
-      d.x && p.x > d.x && p.x < d.x + d.w &&
-      p.y > d.y && p.y < d.y + d.h
+  if(mode==='select'){
+    selected=data.find(d =>
+      d.x && p.x>d.x && p.x<d.x+d.w &&
+      p.y>d.y && p.y<d.y+d.h
     );
   }
 }
 
 function move(e){
-  if(isUI(e)) return;
   if(!drawing) return;
-
   e.preventDefault();
-  const p = getPos(e);
 
-  if(mode === 'pen'){
-    data[data.length-1].points.push(p);
+  const p=getPos(e);
+
+  if(mode==='pen'){
+    data[data.length-1].pts.push(p);
   }
 
-  if(mode === 'select' && selected){
-    selected.x += p.x - startX;
-    selected.y += p.y - startY;
-    startX = p.x;
-    startY = p.y;
+  if(mode==='select' && selected){
+    selected.x += p.x-startX;
+    selected.y += p.y-startY;
+    startX=p.x;
+    startY=p.y;
   }
 
   draw();
 }
 
 function end(e){
-  if(isUI(e)) return;
+  drawing=false;
+  const p=getPos(e);
 
-  e.preventDefault();
-  drawing = false;
-
-  const p = getPos(e);
-
-  if(mode === 'rect'){
+  if(mode==='rect'){
     save();
-    data.push({
-      type:'rect',
-      x:startX,
-      y:startY,
-      w:p.x - startX,
-      h:p.y - startY
-    });
+    data.push({type:'rect',x:startX,y:startY,w:p.x-startX,h:p.y-startY});
   }
 
-  if(mode === 'circle'){
+  if(mode==='circle'){
     save();
-    data.push({
-      type:'circle',
-      x:startX,
-      y:startY,
-      r:Math.hypot(p.x-startX, p.y-startY)
-    });
+    data.push({type:'circle',x:startX,y:startY,r:Math.hypot(p.x-startX,p.y-startY)});
   }
 
-  selected = null;
+  selected=null;
   draw();
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  /* 칠판 배경 */
-  ctx.fillStyle = '#0b1d0b';
+  ctx.fillStyle='#0b1d0b';
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   ctx.strokeStyle='rgba(255,255,255,0.05)';
@@ -218,7 +202,7 @@ function draw(){
 
     if(d.type==='pen'){
       ctx.beginPath();
-      d.points.forEach((p,i)=>{
+      d.pts.forEach((p,i)=>{
         if(i===0) ctx.moveTo(p.x,p.y);
         else ctx.lineTo(p.x,p.y);
       });
