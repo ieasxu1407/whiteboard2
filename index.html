@@ -1,0 +1,115 @@
+<!DOCTYPE html><html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>화이트보드 (버튼 완전 해결 v2)</title>
+<style>
+  html,body { margin:0; padding:0; background:#0b1d0b; overflow:hidden; }/* 실제 그려지는 캔버스 (이건 클릭 안 받음) / canvas { position:fixed; inset:0; z-index:0; pointer-events:none; / 🔥 핵심: 버튼 절대 안 막음 */ }
+
+/* 이벤트를 받는 투명 레이어 */ #hit { position:fixed; inset:0; z-index:1; touch-action:none; }
+
+.toolbar { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); background:#1a2e1a; padding:10px; border-radius:15px; display:flex; gap:8px; z-index:9999; /* 항상 최상단 */ }
+
+button { background:#2e4d2e; color:#fff; border:none; padding:10px; border-radius:10px; font-size:14px; } </style>
+
+</head>
+<body><canvas id="c"></canvas>
+
+<div id="hit"></div><div class="toolbar">
+  <button id="pen">펜</button>
+  <button id="rect">사각형</button>
+  <button id="circle">원</button>
+  <button id="select">선택</button>
+  <button id="undo">실행취소</button>
+  <button id="clear">전체삭제</button>
+</div><script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const hit = document.getElementById('hit');
+
+function resize(){
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  drawAll();
+}
+addEventListener('resize', resize);
+resize();
+
+let mode='pen', drawing=false, startX=0, startY=0;
+let data=[], history=[], selected=null;
+
+// 버튼 (확실히 동작)
+document.getElementById('pen').onclick=()=>mode='pen';
+document.getElementById('rect').onclick=()=>mode='rect';
+document.getElementById('circle').onclick=()=>mode='circle';
+document.getElementById('select').onclick=()=>mode='select';
+document.getElementById('undo').onclick=()=>{ if(history.length){ data=JSON.parse(history.pop()); drawAll(); } };
+document.getElementById('clear').onclick=()=>{ save(); data=[]; drawAll(); };
+
+function save(){ history.push(JSON.stringify(data)); }
+function pos(e){
+  if(e.touches) return {x:e.touches[0].clientX,y:e.touches[0].clientY};
+  return {x:e.clientX,y:e.clientY};
+}
+
+// 🔥 이벤트는 hit 레이어가 받음 (버튼과 완전 분리)
+hit.addEventListener('mousedown',start);
+hit.addEventListener('mousemove',move);
+hit.addEventListener('mouseup',end);
+
+hit.addEventListener('touchstart',start,{passive:false});
+hit.addEventListener('touchmove',move,{passive:false});
+hit.addEventListener('touchend',end,{passive:false});
+
+function start(e){
+  e.preventDefault(); drawing=true;
+  const p=pos(e); startX=p.x; startY=p.y;
+
+  if(mode==='pen'){ save(); data.push({t:'pen',pts:[p]}); }
+
+  if(mode==='select'){
+    selected=data.find(d=> d.x && p.x>d.x && p.x<d.x+d.w && p.y>d.y && p.y<d.y+d.h);
+  }
+}
+
+function move(e){
+  e.preventDefault(); if(!drawing) return;
+  const p=pos(e);
+
+  if(mode==='pen') data[data.length-1].pts.push(p);
+
+  if(mode==='select' && selected){
+    selected.x += p.x-startX; selected.y += p.y-startY;
+    startX=p.x; startY=p.y;
+  }
+
+  drawAll();
+}
+
+function end(e){
+  e.preventDefault(); drawing=false;
+  const p=pos(e);
+
+  if(mode==='rect'){ save(); data.push({t:'rect',x:startX,y:startY,w:p.x-startX,h:p.y-startY}); }
+
+  if(mode==='circle'){ save(); const r=Math.hypot(p.x-startX,p.y-startY); data.push({t:'circle',x:startX,y:startY,r}); }
+
+  selected=null; drawAll();
+}
+
+function drawAll(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle='#0b1d0b'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.strokeStyle='rgba(255,255,255,0.05)';
+  for(let i=0;i<canvas.height;i+=40){ ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+
+  data.forEach(d=>{
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+    if(d.t==='pen'){ ctx.beginPath(); d.pts.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke(); }
+    if(d.t==='rect') ctx.strokeRect(d.x,d.y,d.w,d.h);
+    if(d.t==='circle'){ ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,Math.PI*2); ctx.stroke(); }
+  });
+}
+</script></body>
+</html>
